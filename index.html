@@ -2,9 +2,9 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visor RA - Topografía Nuevo Colón</title>
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
     <style>
         body { margin: 0; padding: 0; width: 100vw; height: 100vh; background-color: #222; font-family: Arial, sans-serif; overflow: hidden; }
         model-viewer { width: 100%; height: 100%; outline: none; }
@@ -21,11 +21,48 @@
 
         /* Leyenda Altimétrica */
         #leyenda {
-            position: absolute; bottom: 20px; right: 20px;
+            position: absolute; 
+            bottom: 90px; 
+            right: 20px;
             background: rgba(255, 255, 255, 0.9);
-            padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            z-index: 100; display: flex;
+            padding: 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 100; 
+            display: flex;
+}
+        @media (max-width: 768px) {
+        #panel-control {
+            top: 10px;
+            left: 10px;
+            padding: 12px;
+            max-width: 220px;
+            }
+        #leyenda {
+            bottom: 110px;
+            right: 10px;
+            padding: 10px;
+    }
+}
+        #btn-ar {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 120;
+            padding: 12px 18px;
+            border: none;
+            border-radius: 10px;
+            background: #1f6feb;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.35);
         }
+
+        #btn-ar[hidden] {
+            display: none;
+        }
+
         .barra-colores {
             width: 20px; height: 150px; margin-right: 15px; border-radius: 4px;
             background: linear-gradient(to top, #d1f2eb, #3eb44a, #e2b72f, #b7410e, #8b2500, #a6a6a6, #ffffff); 
@@ -69,37 +106,72 @@
         
         <button class="etiqueta hotspot-etiqueta" slot="hotspot-meta" data-position="1 0.5 1" data-normal="0 1 0">
             <strong>Ficha IGAC</strong><br>Plancha: 191IIIC4<br>Escala: 1:10.000<br>Nuevo Colón, Boyacá
+        <button id="btn-ar" aria-label="Ver modelo en realidad aumentada">Ver en RA</button>
         </button>
 
     </model-viewer>
 
     <script>
-        const visor = document.querySelector('#visor-topo');
-        
-        visor.addEventListener('load', () => {
-            const sceneSymbol = Object.getOwnPropertySymbols(visor).find(x => x.description === 'scene');
-            const scene = visor[sceneSymbol];
+    const visor = document.querySelector('#visor-topo');
+    const btnAR = document.querySelector('#btn-ar');
 
-            const toggleNodosPorNombre = (palabraClave, visible) => {
-                if (!scene) return;
-                scene.traverse((child) => {
-                    if (child.name && child.name.toLowerCase().includes(palabraClave.toLowerCase())) {
-                        child.visible = visible;
-                    }
-                });
-            };
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-            document.getElementById('check-coords').addEventListener('change', (e) => toggleNodosPorNombre('coordenada', e.target.checked));
-            document.getElementById('check-norte').addEventListener('change', (e) => toggleNodosPorNombre('norte', e.target.checked));
-            document.getElementById('check-rios').addEventListener('change', (e) => toggleNodosPorNombre('rio', e.target.checked));
-            document.getElementById('check-vias').addEventListener('change', (e) => toggleNodosPorNombre('vias', e.target.checked));
-            document.getElementById('check-limites').addEventListener('change', (e) => toggleNodosPorNombre('limite', e.target.checked));
+    function lanzarSceneViewerAndroid() {
+        const fileUrl = new URL('topografia.glb', window.location.href).href;
+        const fallbackUrl = encodeURIComponent(window.location.href);
+        const title = encodeURIComponent('Topografía Nuevo Colón');
 
-            document.getElementById('check-etiquetas').addEventListener('change', (e) => {
-                const etiquetas = document.querySelectorAll('.hotspot-etiqueta');
-                etiquetas.forEach(etiq => etiq.style.display = e.target.checked ? 'block' : 'none');
+        const intentUrl =
+        `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(fileUrl)}&mode=ar_preferred&title=${title}` +
+        `#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;` +
+        `S.browser_fallback_url=${fallbackUrl};end;`;
+
+        window.location.href = intentUrl;
+    }
+
+    function lanzarAR() {
+        if (isAndroid) {
+            lanzarSceneViewerAndroid();
+            return;
+        }
+
+        if (isIOS && typeof visor.activateAR === 'function') {
+            visor.activateAR();
+            return;
+        }
+
+        alert('La RA no está disponible en este dispositivo o navegador. Puedes seguir usando el visor 3D.');
+    }
+
+    visor.addEventListener('load', () => {
+        const sceneSymbol = Object.getOwnPropertySymbols(visor).find(x => x.description === 'scene');
+        const scene = visor[sceneSymbol];
+
+        const toggleNodosPorNombre = (palabraClave, visible) => {
+            if (!scene) return;
+            scene.traverse((child) => {
+                if (child.name && child.name.toLowerCase().includes(palabraClave.toLowerCase())) {
+                    child.visible = visible;
+                }
             });
+        };
+
+        document.getElementById('check-coords').addEventListener('change', (e) => toggleNodosPorNombre('coordenada', e.target.checked));
+        document.getElementById('check-norte').addEventListener('change', (e) => toggleNodosPorNombre('norte', e.target.checked));
+        document.getElementById('check-rios').addEventListener('change', (e) => toggleNodosPorNombre('rio', e.target.checked));
+        document.getElementById('check-vias').addEventListener('change', (e) => toggleNodosPorNombre('via', e.target.checked));
+        document.getElementById('check-limites').addEventListener('change', (e) => toggleNodosPorNombre('limite', e.target.checked));
+
+        document.getElementById('check-etiquetas').addEventListener('change', (e) => {
+            const etiquetas = document.querySelectorAll('.hotspot-etiqueta');
+            etiquetas.forEach(etiq => etiq.style.display = e.target.checked ? 'block' : 'none');
         });
+    });
+
+    btnAR.addEventListener('click', lanzarAR);
     </script>
 </body>
 </html>
+
